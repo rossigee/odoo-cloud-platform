@@ -38,13 +38,13 @@ class IrAttachment(models.Model):
         The following environment variables can be set:
         * ``AWS_HOST``
         * ``AWS_REGION``
-        * ``AWS_ACCESS_KEY_ID``
-        * ``AWS_SECRET_ACCESS_KEY``
         * ``AWS_BUCKETNAME``
 
         If a name is provided, we'll read this bucket, otherwise, the bucket
         from the environment variable ``AWS_BUCKETNAME`` will be read.
 
+        Other ``AWS_*`` variables will be required depending on your method
+        of authentication (i.e. IAM user or role). See `boto3` docs for info.
         """
         host = os.environ.get('AWS_HOST')
 
@@ -53,31 +53,17 @@ class IrAttachment(models.Model):
             host = 'https://%s' % host
 
         region_name = os.environ.get('AWS_REGION')
-        access_key = os.environ.get('AWS_ACCESS_KEY_ID')
-        secret_key = os.environ.get('AWS_SECRET_ACCESS_KEY')
         bucket_name = name or os.environ.get('AWS_BUCKETNAME')
 
-        params = {
-            'aws_access_key_id': access_key,
-            'aws_secret_access_key': secret_key,
-        }
+        params = {}
         if host:
             params['endpoint_url'] = host
         if region_name:
             params['region_name'] = region_name
-        if not (access_key and secret_key and bucket_name):
-            msg = _('If you want to read from the %s S3 bucket, the following '
-                    'environment variables must be set:\n'
-                    '* AWS_ACCESS_KEY_ID\n'
-                    '* AWS_SECRET_ACCESS_KEY\n'
-                    'If you want to write in the %s S3 bucket, this variable '
-                    'must be set as well:\n'
-                    '* AWS_BUCKETNAME\n'
-                    'Optionally, the S3 host can be changed with:\n'
-                    '* AWS_HOST\n'
-                    ) % (bucket_name, bucket_name)
-
+        if not (bucket_name):
+            msg = _('Please ensure that you have configured the AWS S3 bucket name.\n')
             raise exceptions.UserError(msg)
+
         # try:
         s3 = boto3.resource('s3', **params)
         bucket = s3.Bucket(bucket_name)
