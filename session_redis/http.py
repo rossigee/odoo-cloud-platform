@@ -51,7 +51,7 @@ def session_store(self):
         sentinel = Sentinel([(sentinel_host, sentinel_port)], password=password)
         redis_client = sentinel.master_for(sentinel_master_name)
     elif cluster_connection and url:
-        redis_client = redis.cluster.from_url(url)
+        redis_client = redis.cluster.RedisCluster(url=url)
     elif cluster_connection:
         redis_client = redis.cluster.RedisCluster(host=host, port=port, username=username, password=password)
     elif url:
