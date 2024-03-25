@@ -76,15 +76,6 @@ def session_gc(session_store):
     return
 
 
-def purge_fs_sessions(path):
-    for fname in os.listdir(path):
-        path = os.path.join(path, fname)
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
-
-
 if is_true(os.environ.get("ODOO_SESSION_REDIS")):
     if sentinel_host:
         _logger.debug(
@@ -104,5 +95,3 @@ if is_true(os.environ.get("ODOO_SESSION_REDIS")):
 
     http.Root.session_store = session_store
     http.session_gc = session_gc
-    # clean the existing sessions on the file system
-    purge_fs_sessions(odoo.tools.config.session_dir)
