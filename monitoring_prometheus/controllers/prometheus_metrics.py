@@ -4,7 +4,7 @@
 from prometheus_client import generate_latest
 
 from odoo.http import Controller, route
-
+from werkzeug.wrappers import Response
 
 class PrometheusController(Controller):
     @route("/metrics", auth="public")
