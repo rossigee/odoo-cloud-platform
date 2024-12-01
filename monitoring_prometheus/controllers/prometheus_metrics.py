@@ -9,6 +9,5 @@ from odoo.http import Controller, route
 class PrometheusController(Controller):
     @route("/metrics", auth="public")
     def metrics(self):
-        response = self.env['ir.http'].request()
-        response.headers['Content-Type'] = 'text/plain'
-        return generate_latest()
+        headers = {'Content-Type': 'text/plain'}
+        return Response(generate_latest(), headers=headers)
