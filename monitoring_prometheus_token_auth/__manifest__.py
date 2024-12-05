@@ -3,8 +3,8 @@
 
 
 {
-    "name": "Monitoring: Prometheus Metrics",
-    "version": "14.0.1.0.1",
+    "name": "Monitoring: Prometheus Metrics with API token auth",
+    "version": "14.0.1.0.0",
     "author": "Camptocamp,Odoo Community Association (OCA)",
     "license": "AGPL-3",
     "category": "category",
