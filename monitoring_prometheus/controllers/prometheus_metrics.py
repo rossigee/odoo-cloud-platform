@@ -5,9 +5,8 @@ from prometheus_client import generate_latest
 
 from odoo.http import Controller, route, request
 
-
 class PrometheusController(Controller):
-    @route("/metrics", auth='token')
+    @route("/metrics", auth='public')
     def metrics(self, **kw):
         headers = {'Content-Type': 'text/plain'}
         return request.make_response(generate_latest(), headers=headers)
