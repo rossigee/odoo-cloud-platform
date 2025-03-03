@@ -11,6 +11,8 @@ The storage of sessions in Redis is activated using environment variables.
 * ``ODOO_SESSION_REDIS`` has to be ``1`` or ``true``
 * ``ODOO_SESSION_REDIS_HOST`` is the redis hostname (default is ``localhost``)
 * ``ODOO_SESSION_REDIS_PORT`` is the redis port (default is ``6379``)
+* ``ODOO_SESSION_REDIS_USERNAME`` is the username for the AUTH command
+  (default: ``default``)
 * ``ODOO_SESSION_REDIS_PASSWORD`` is the password for the AUTH command
   (optional)
 * ``ODOO_SESSION_REDIS_URL`` is an alternative way to define the Redis server
@@ -20,6 +22,8 @@ The storage of sessions in Redis is activated using environment variables.
   the sessions (default is 7 days)
 * ``ODOO_SESSION_REDIS_EXPIRATION_ANONYMOUS`` is the time in seconds before expiration of
   the anonymous sessions (default is 3 hours)
+* ``ODOO_SESSION_REDIS_CLUSTER`` has to be ``1`` or ``true`` to use Cluster connection.
+  (default: ``0``)
 
 
 The keys are set to ``session:<session id>``.

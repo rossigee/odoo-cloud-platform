@@ -15,10 +15,11 @@ _logger = logging.getLogger(__name__)
 
 try:
     import redis
+    import redis.cluster
     from redis.sentinel import Sentinel
 except ImportError:
     redis = None  # noqa
-    _logger.debug("Cannot 'import redis'.")
+    _logger.error("Redis sessions enabled but cannot import Redis library.")
 
 
 def is_true(strval):
@@ -37,9 +38,11 @@ host = os.environ.get("ODOO_SESSION_REDIS_HOST", "localhost")
 port = int(os.environ.get("ODOO_SESSION_REDIS_PORT", 6379))
 prefix = os.environ.get("ODOO_SESSION_REDIS_PREFIX")
 url = os.environ.get("ODOO_SESSION_REDIS_URL")
+username = os.environ.get("ODOO_SESSION_REDIS_USERNAME", "default")
 password = os.environ.get("ODOO_SESSION_REDIS_PASSWORD")
 expiration = os.environ.get("ODOO_SESSION_REDIS_EXPIRATION")
 anon_expiration = os.environ.get("ODOO_SESSION_REDIS_EXPIRATION_ANONYMOUS")
+cluster_connection = is_true(os.environ.get("ODOO_SESSION_REDIS_CLUSTER", "0"))
 
 
 @lazy_property
@@ -47,10 +50,14 @@ def session_store(self):
     if sentinel_host:
         sentinel = Sentinel([(sentinel_host, sentinel_port)], password=password)
         redis_client = sentinel.master_for(sentinel_master_name)
+    elif cluster_connection and url:
+        redis_client = redis.cluster.RedisCluster(url=url)
+    elif cluster_connection:
+        redis_client = redis.cluster.RedisCluster(host=host, port=port, username=username, password=password)
     elif url:
         redis_client = redis.from_url(url)
     else:
-        redis_client = redis.Redis(host=host, port=port, password=password)
+        redis_client = redis.Redis(host=host, port=port, username=username, password=password)
     return RedisSessionStore(
         redis=redis_client,
         prefix=prefix,
@@ -86,5 +93,3 @@ if is_true(os.environ.get("ODOO_SESSION_REDIS")):
             port,
         )
     http.Application.session_store = session_store
-    # clean the existing sessions on the file system
-    purge_fs_sessions(config.session_dir)
