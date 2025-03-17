@@ -1,4 +1,5 @@
 # Copyright 2016-2021 Camptocamp SA
+# Copyright 2025 Ross Golder
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 from prometheus_client import Counter, Summary
@@ -8,25 +9,29 @@ from werkzeug.exceptions import BadRequest, Unauthorized
 from odoo import models
 from odoo.http import request
 
+
 REQUEST_TIME = Summary(
-    "request_latency_sec", "Request response time in sec", ["query_type"]
-)
-LONGPOLLING_COUNT = Counter("longpolling", "Longpolling request count")
+    "request_latency_sec",
+    "Request response time in sec",
+    ["query_type"])
+LONGPOLLING_COUNT = Counter(
+    "longpolling",
+    "Longpolling request count")
 
 
 class IrHttp(models.AbstractModel):
     _inherit = "ir.http"
 
     @classmethod
-    def _dispatch(cls):
+    def _dispatch(cls, endpoint):
         path_info = request.httprequest.environ.get("PATH_INFO")
 
         if path_info.startswith("/longpolling/"):
             LONGPOLLING_COUNT.inc()
-            return super()._dispatch()
+            return super()._dispatch(endpoint)
 
         if path_info.startswith("/metrics"):
-            return super()._dispatch()
+            return super()._dispatch(endpoint)
 
         if path_info.startswith("/web/static"):
             label = "assets"
@@ -37,7 +42,7 @@ class IrHttp(models.AbstractModel):
 
         res = None
         with REQUEST_TIME.labels(label).time():
-            res = super()._dispatch()
+            res = super()._dispatch(endpoint)
 
         return res
 
@@ -55,4 +60,4 @@ class IrHttp(models.AbstractModel):
             raise Unauthorized('Access token invalid')
 
         # take the identity of the API key user
-        request.uid = user_id
+        request.update_env(user=user_id)
