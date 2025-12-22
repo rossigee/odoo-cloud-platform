@@ -7,24 +7,30 @@ import sys
 import threading
 import uuid
 
+import pythonjsonlogger
+
 from odoo import http
 
 from .strtobool import strtobool
 
 _logger = logging.getLogger(__name__)
 
-try:
-    from pythonjsonlogger.json import JsonFormatter
-except ImportError:
-    JsonFormatter = None  # noqa
-    _logger.debug("Cannot 'import pythonjsonlogger'.")
+# Module ``jsonlogger`` of package ``python-json-logger`` is deprecated since version
+# 3.1.0, keep it for backward compatibility
+if hasattr(pythonjsonlogger, "json"):
+    jsonlogger = pythonjsonlogger.json
+elif hasattr(pythonjsonlogger, "jsonlogger"):
+    jsonlogger = pythonjsonlogger.jsonlogger
+else:
+    jsonlogger = None  # noqa
+    _logger.debug("Cannot import 'json' or 'jsonlogger' from 'pythonjsonlogger'.")
 
 
 def is_true(strval):
     return bool(strtobool(strval or "0".lower()))
 
 
-class OdooJsonFormatter(JsonFormatter):
+class OdooJsonFormatter(jsonlogger.JsonFormatter if jsonlogger else object):
     def add_fields(self, log_record, record, message_dict):
         record.pid = os.getpid()
         record.dbname = getattr(threading.current_thread(), "dbname", "?")
