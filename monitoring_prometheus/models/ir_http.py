@@ -18,7 +18,7 @@ class IrHttp(models.AbstractModel):
     @classmethod
     def _dispatch(cls, endpoint):
         # httprequest environment is updated with WSGI environment variables in core
-        # REF: https://github.com/odoo/odoo/blob/19.0/odoo/http.py#L2120
+        # REF: https://github.com/odoo/odoo/blob/17.0/addons/http_routing/models/ir_http.py#L538
         path_info = request.httprequest.environ.get("PATH_INFO")
 
         if path_info.startswith("/longpolling/"):
