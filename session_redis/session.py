@@ -143,13 +143,20 @@ class RedisSessionStore(SessionStore):
             return self.new()
         try:
             data = json.loads(saved.decode("utf-8"), cls=json_encoding.SessionDecoder)
-        except ValueError:
+        except Exception:
             _logger.debug(
                 f"session for key '{key}' has been asked but its json "
                 "content could not be read, it has been reset"
             )
             data = {}
-        return self.session_class(data, sid, False)
+        try:
+            return self.session_class(data, sid, False)
+        except Exception as e:
+            _logger.warning(
+                f"Failed to initialize session '{key}': {type(e).__name__}: {e}. "
+                "Returning new session instead of 500 error."
+            )
+            return self.new()
 
     def list(self):
         keys = self.redis.keys(f"{self.prefix}*")
