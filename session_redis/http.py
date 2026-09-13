@@ -124,9 +124,6 @@ if is_true(os.getenv("ODOO_SESSION_REDIS")):
             port,
         )
     http.Application.session_store = session_store
-    _logger.warning("session_store property has been assigned to http.Application")
-else:
-    _logger.warning("session_redis: ODOO_SESSION_REDIS is not enabled, skipping Redis session store setup")
     # cached_property needs __set_name__ to be called, but it is not called
     # automatically since we are attaching the property after instance creation.
     # So we have to do it manually
@@ -136,5 +133,8 @@ else:
         http.Application,
         "session_store",
     )
+    _logger.warning("session_store property has been assigned to http.Application")
     # clean the existing sessions on the file system
     purge_fs_sessions(config.session_dir)
+else:
+    _logger.warning("session_redis: ODOO_SESSION_REDIS is not enabled, skipping Redis session store setup")
