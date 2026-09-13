@@ -11,6 +11,7 @@ from .session import RedisSessionStore
 from .strtobool import strtobool
 
 _logger = logging.getLogger(__name__)
+_logger.warning("session_redis.http module is being imported")
 
 try:
     import redis
@@ -96,22 +97,29 @@ def purge_fs_sessions(path):
             _logger.warning("OS Error during purge of redis sessions.")
 
 
+_odoo_session_redis_env = os.getenv("ODOO_SESSION_REDIS")
+_logger.warning(f"Checking ODOO_SESSION_REDIS: value={_odoo_session_redis_env!r}, is_true={is_true(_odoo_session_redis_env)}")
+
 if is_true(os.getenv("ODOO_SESSION_REDIS")):
+    _logger.warning("session_redis: Initializing Redis session store!")
     if sentinel_host:
-        _logger.debug(
+        _logger.warning(
             "HTTP sessions stored in Redis with prefix '%s'. Using Sentinel on %s:%s",
             prefix or "",
             sentinel_host,
             sentinel_port,
         )
     else:
-        _logger.debug(
+        _logger.warning(
             "HTTP sessions stored in Redis with prefix '%s' on %s:%s",
             prefix or "",
             host,
             port,
         )
     http.Application.session_store = session_store
+    _logger.warning("session_store property has been assigned to http.Application")
+else:
+    _logger.warning("session_redis: ODOO_SESSION_REDIS is not enabled, skipping Redis session store setup")
     # cached_property needs __set_name__ to be called, but it is not called
     # automatically since we are attaching the property after instance creation.
     # So we have to do it manually
