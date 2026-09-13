@@ -47,34 +47,45 @@ redis_cluster = os.getenv("ODOO_SESSION_REDIS_CLUSTER", "0")
 
 @functools.cached_property
 def session_store(self):
-    if sentinel_host:
-        sentinel = Sentinel([(sentinel_host, sentinel_port)], password=password)
-        redis_client = sentinel.master_for(sentinel_master_name)
-    elif url:
-        redis_client = redis.from_url(url)
-    elif is_true(redis_cluster):
-        redis_client = redis.RedisCluster(
-            host=host,
-            port=port,
-            password=password,
-            ssl=is_true(ssl),
-            ssl_cert_reqs=is_true(ssl_cert_reqs),
+    try:
+        if sentinel_host:
+            sentinel = Sentinel([(sentinel_host, sentinel_port)], password=password)
+            redis_client = sentinel.master_for(sentinel_master_name)
+        elif url:
+            redis_client = redis.from_url(url)
+        elif is_true(redis_cluster):
+            redis_client = redis.RedisCluster(
+                host=host,
+                port=port,
+                password=password,
+                ssl=is_true(ssl),
+                ssl_cert_reqs=is_true(ssl_cert_reqs),
+            )
+        else:
+            redis_client = redis.Redis(
+                host=host,
+                port=port,
+                password=password,
+                ssl=is_true(ssl),
+                ssl_cert_reqs=is_true(ssl_cert_reqs),
+            )
+        return RedisSessionStore(
+            redis=redis_client,
+            prefix=prefix,
+            expiration=expiration,
+            anon_expiration=anon_expiration,
+            session_class=http.Session,
         )
-    else:
-        redis_client = redis.Redis(
-            host=host,
-            port=port,
-            password=password,
-            ssl=is_true(ssl),
-            ssl_cert_reqs=is_true(ssl_cert_reqs),
+    except Exception as e:
+        _logger.error(
+            f"Failed to initialize Redis session store: {type(e).__name__}: {e}. "
+            "Falling back to default session store."
         )
-    return RedisSessionStore(
-        redis=redis_client,
-        prefix=prefix,
-        expiration=expiration,
-        anon_expiration=anon_expiration,
-        session_class=http.Session,
-    )
+        # Return the default in-memory session store instead of crashing
+        return http.FilesystemSessionStore(
+            session_dir=config.session_dir,
+            session_class=http.Session,
+        )
 
 
 def purge_fs_sessions(path):
