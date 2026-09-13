@@ -50,7 +50,7 @@ class RedisSessionStore(SessionStore):
             self.anon_expiration = anon_expiration
         self.prefix = "session:"
         if prefix:
-            self.prefix = f"{self.prefix}:{prefix}:"
+            self.prefix = f"{self.prefix}:{prefix}::"
 
     # Use the key generation method of the FileSystemSessionStore: it seems that
     # the one on the general SessionStore does not generate long enough keys to
