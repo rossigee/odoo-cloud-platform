@@ -127,13 +127,15 @@ class RedisSessionStore(SessionStore):
             return self.new()
 
         key = self.build_key(sid)
-        _logger.debug(f"Loading session from Redis: {key}")
+        _logger.info(f"RedisSessionStore.get() called for sid={sid}, key={key}")
         try:
+            _logger.debug(f"Attempting redis.get({key})")
             saved = self.redis.get(key)
+            _logger.debug(f"redis.get() returned: {type(saved).__name__} (len={len(saved) if saved else 0})")
         except Exception as e:
-            _logger.warning(
-                f"Failed to load session '{key}' from Redis: {type(e).__name__}: {e}. "
-                "Returning new session instead of 500 error."
+            _logger.error(
+                f"REDIS ERROR in get(): {type(e).__name__}: {e}. "
+                f"Returning new session instead of 500 error."
             )
             return self.new()
         if not saved:
@@ -144,17 +146,19 @@ class RedisSessionStore(SessionStore):
             return self.new()
         try:
             data = json.loads(saved.decode("utf-8"), cls=json_encoding.SessionDecoder)
-        except Exception:
-            _logger.debug(
-                f"session for key '{key}' has been asked but its json "
-                "content could not be read, it has been reset"
+        except Exception as e:
+            _logger.warning(
+                f"Failed to deserialize session JSON for '{key}': {type(e).__name__}: {e}. "
+                "Returning new session with empty data."
             )
             data = {}
         try:
-            return self.session_class(data, sid, False)
+            session = self.session_class(data, sid, False)
+            _logger.debug(f"Session created successfully for {key}")
+            return session
         except Exception as e:
-            _logger.warning(
-                f"Failed to initialize session '{key}': {type(e).__name__}: {e}. "
+            _logger.error(
+                f"Failed to initialize session class for '{key}': {type(e).__name__}: {e}. "
                 "Returning new session instead of 500 error."
             )
             return self.new()
