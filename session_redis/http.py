@@ -45,6 +45,8 @@ ssl = os.getenv("ODOO_SESSION_REDIS_SSL", "1")
 ssl_cert_reqs = os.getenv("ODOO_SESSION_REDIS_SSL_CERT_REQS", "1")
 redis_cluster = os.getenv("ODOO_SESSION_REDIS_CLUSTER", "0")
 
+_logger.warning(f"session_redis env vars: sentinel_host={sentinel_host!r}, url={url!r}, host={host!r}, port={port!r}, prefix={prefix!r}, redis_cluster={redis_cluster!r}")
+
 
 @functools.cached_property
 def session_store(self):
