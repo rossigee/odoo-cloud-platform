@@ -48,12 +48,16 @@ redis_cluster = os.getenv("ODOO_SESSION_REDIS_CLUSTER", "0")
 
 @functools.cached_property
 def session_store(self):
+    _logger.warning(f"session_store property accessed: sentinel_host={sentinel_host!r}, url={url!r}, redis_cluster={redis_cluster!r}")
     if sentinel_host:
+        _logger.warning(f"Using Sentinel: {sentinel_host}:{sentinel_port}")
         sentinel = Sentinel([(sentinel_host, sentinel_port)], password=password)
         redis_client = sentinel.master_for(sentinel_master_name)
     elif url:
+        _logger.warning(f"Using Redis URL: {url!r}")
         redis_client = redis.from_url(url)
     elif is_true(redis_cluster):
+        _logger.warning(f"Using Redis Cluster: {host}:{port}")
         redis_client = redis.RedisCluster(
             host=host,
             port=port,
@@ -62,6 +66,7 @@ def session_store(self):
             ssl_cert_reqs=is_true(ssl_cert_reqs),
         )
     else:
+        _logger.warning(f"Using standard Redis: {host}:{port}")
         redis_client = redis.Redis(
             host=host,
             port=port,
