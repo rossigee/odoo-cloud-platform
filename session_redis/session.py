@@ -96,16 +96,28 @@ class RedisSessionStore(SessionStore):
         data = json.dumps(dict(session), cls=json_encoding.SessionEncoder).encode(
             "utf-8"
         )
-        if self.redis.set(key, data):
-            if not (expiration and isinstance(expiration, int)):
-                expiration = DEFAULT_SESSION_TIMEOUT_ANONYMOUS
-                expiration = DEFAULT_SESSION_TIMEOUT_ANONYMOUS
-            return self.redis.expire(key, expiration)
+        try:
+            if self.redis.set(key, data):
+                if not (expiration and isinstance(expiration, int)):
+                    expiration = DEFAULT_SESSION_TIMEOUT_ANONYMOUS
+                    expiration = DEFAULT_SESSION_TIMEOUT_ANONYMOUS
+                return self.redis.expire(key, expiration)
+        except Exception as e:
+            _logger.error(
+                f"Failed to save session '{key}' to Redis: {type(e).__name__}: {e}"
+            )
+            return False
 
     def delete(self, session):
         key = self.build_key(session.sid)
         _logger.debug(f"deleting session with key {key}")
-        return self.redis.delete(key)
+        try:
+            return self.redis.delete(key)
+        except Exception as e:
+            _logger.error(
+                f"Failed to delete session '{key}' from Redis: {type(e).__name__}: {e}"
+            )
+            return False
 
     def get(self, sid):
         if not self.is_valid_key(sid):
@@ -115,7 +127,14 @@ class RedisSessionStore(SessionStore):
             return self.new()
 
         key = self.build_key(sid)
-        saved = self.redis.get(key)
+        try:
+            saved = self.redis.get(key)
+        except Exception as e:
+            _logger.warning(
+                f"Failed to load session '{key}' from Redis: {type(e).__name__}: {e}. "
+                "Returning new session instead of 500 error."
+            )
+            return self.new()
         if not saved:
             _logger.debug(
                 f"session with non-existent key '{key}' has been asked, "
