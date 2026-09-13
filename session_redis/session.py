@@ -127,6 +127,7 @@ class RedisSessionStore(SessionStore):
             return self.new()
 
         key = self.build_key(sid)
+        _logger.debug(f"Loading session from Redis: {key}")
         try:
             saved = self.redis.get(key)
         except Exception as e:

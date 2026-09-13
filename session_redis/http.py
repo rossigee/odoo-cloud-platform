@@ -68,13 +68,19 @@ def session_store(self):
             ssl=is_true(ssl),
             ssl_cert_reqs=is_true(ssl_cert_reqs),
         )
-    return RedisSessionStore(
-        redis=redis_client,
-        prefix=prefix,
-        expiration=expiration,
-        anon_expiration=anon_expiration,
-        session_class=http.Session,
-    )
+    try:
+        return RedisSessionStore(
+            redis=redis_client,
+            prefix=prefix,
+            expiration=expiration,
+            anon_expiration=anon_expiration,
+            session_class=http.Session,
+        )
+    except Exception as e:
+        _logger.error(
+            f"Failed to initialize Redis session store: {type(e).__name__}: {e}"
+        )
+        raise
 
 
 def purge_fs_sessions(path):
