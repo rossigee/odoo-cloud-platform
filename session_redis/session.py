@@ -85,12 +85,14 @@ class RedisSessionStore(SessionStore):
             )
         if _logger.isEnabledFor(logging.DEBUG):
             if session.uid:
-                user_msg = f"user '{session.login}' (id: {session.uid})"
+                user_msg = "user '%s' (id: %s)" % (session.login, session.uid)
             else:
                 user_msg = "anonymous user"
             _logger.debug(
-                f"saving session with key '{key}' and "
-                f"expiration of {expiration} seconds for {user_msg}"
+                "saving session with key '%s' and expiration of %s seconds for %s",
+                key,
+                expiration,
+                user_msg,
             )
 
         data = json.dumps(dict(session), cls=json_encoding.SessionEncoder).encode(
@@ -100,71 +102,90 @@ class RedisSessionStore(SessionStore):
             if self.redis.set(key, data):
                 if not (expiration and isinstance(expiration, int)):
                     expiration = DEFAULT_SESSION_TIMEOUT_ANONYMOUS
-                    expiration = DEFAULT_SESSION_TIMEOUT_ANONYMOUS
                 return self.redis.expire(key, expiration)
         except Exception as e:
             _logger.error(
-                f"Failed to save session '{key}' to Redis: {type(e).__name__}: {e}"
+                "Failed to save session '%s' to Redis: %s: %s",
+                key,
+                type(e).__name__,
+                e,
             )
             return False
 
     def delete(self, session):
         key = self.build_key(session.sid)
-        _logger.debug(f"deleting session with key {key}")
+        _logger.debug("deleting session with key %s", key)
         try:
             return self.redis.delete(key)
         except Exception as e:
             _logger.error(
-                f"Failed to delete session '{key}' from Redis: {type(e).__name__}: {e}"
+                "Failed to delete session '%s' from Redis: %s: %s",
+                key,
+                type(e).__name__,
+                e,
             )
             return False
 
     def get(self, sid):
         if not self.is_valid_key(sid):
             _logger.debug(
-                f"session with invalid sid '{sid}' has been asked, returning a new one"
+                "session with invalid sid '%s' has been asked, returning a new one",
+                sid,
             )
             return self.new()
 
         key = self.build_key(sid)
-        _logger.info(f"RedisSessionStore.get() called for sid={sid}, key={key}")
+        _logger.debug("RedisSessionStore.get() called for sid=%s, key=%s", sid, key)
         try:
-            _logger.debug(f"Attempting redis.get({key})")
+            _logger.debug("Attempting redis.get(%s)", key)
             saved = self.redis.get(key)
-            _logger.debug(f"redis.get() returned: {type(saved).__name__} (len={len(saved) if saved else 0})")
+            _logger.debug(
+                "redis.get() returned: %s (len=%s)",
+                type(saved).__name__,
+                len(saved) if saved else 0,
+            )
         except Exception as e:
             _logger.error(
-                f"REDIS ERROR in get(): {type(e).__name__}: {e}. "
-                f"Returning new session instead of 500 error."
+                "REDIS ERROR in get(): %s: %s. Returning new session instead of 500 error.",
+                type(e).__name__,
+                e,
             )
             return self.new()
         if not saved:
             _logger.debug(
-                f"session with non-existent key '{key}' has been asked, "
-                "returning a new one"
+                "session with non-existent key '%s' has been asked, returning a new one",
+                key,
             )
             return self.new()
         try:
             data = json.loads(saved.decode("utf-8"), cls=json_encoding.SessionDecoder)
         except Exception as e:
             _logger.warning(
-                f"Failed to deserialize session JSON for '{key}': {type(e).__name__}: {e}. "
-                "Returning new session with empty data."
+                "Failed to deserialize session JSON for '%s': %s: %s. "
+                "Returning new session with empty data.",
+                key,
+                type(e).__name__,
+                e,
             )
             data = {}
         try:
             session = self.session_class(data, sid, False)
-            _logger.debug(f"Session created successfully for {key}")
+            _logger.debug("Session created successfully for %s", key)
             return session
         except Exception as e:
             _logger.error(
-                f"Failed to initialize session class for '{key}': {type(e).__name__}: {e}. "
-                "Returning new session instead of 500 error."
+                "Failed to initialize session class for '%s': %s: %s. "
+                "Returning new session instead of 500 error.",
+                key,
+                type(e).__name__,
+                e,
             )
             return self.new()
 
     def list(self):
-        keys = self.redis.keys(f"{self.prefix}*")
+        keys = []
+        for key in self.redis.scan_iter(match=f"{self.prefix}*", count=1000):
+            keys.append(key)
         _logger.debug("a listing redis keys has been called")
         return [key[len(self.prefix) :] for key in keys]
 
@@ -207,9 +228,12 @@ class RedisSessionStore(SessionStore):
         identifiers = set(identifiers)
         not_found = set()
         for partial_sid in identifiers:
-            key = f"session::{self.prefix}:{partial_sid}*"
-            match = self.redis.keys(pattern=key)
-            if not match:
+            key_pattern = f"{self.prefix}{partial_sid}*"
+            found = False
+            for _ in self.redis.scan_iter(match=key_pattern, count=100):
+                found = True
+                break
+            if not found:
                 not_found.add(partial_sid)
         return not_found
 

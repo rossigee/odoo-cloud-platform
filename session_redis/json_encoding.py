@@ -20,7 +20,7 @@ class SessionEncoder(json.JSONEncoder):
             return {"_type": "date_isoformat", "value": obj.isoformat()}
         elif isinstance(obj, set):
             return {"_type": "set", "value": tuple(obj)}
-        return json.JSONEncoder.default(self, obj)
+        return super().default(obj)
 
 
 class SessionDecoder(json.JSONDecoder):

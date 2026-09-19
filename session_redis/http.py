@@ -3,6 +3,8 @@
 import functools
 import logging
 import os
+import re
+from typing import Optional
 
 from odoo import http
 from odoo.tools import config
@@ -11,7 +13,6 @@ from .session import RedisSessionStore
 from .strtobool import strtobool
 
 _logger = logging.getLogger(__name__)
-_logger.warning("session_redis.http module is being imported")
 
 try:
     import redis
@@ -19,6 +20,20 @@ try:
 except ImportError:
     redis = None  # noqa
     _logger.debug("Cannot 'import redis'.")
+
+
+def _redact_url(url: Optional[str]) -> str:
+    """Redact password from Redis URL for safe logging."""
+    if not url:
+        return "<not set>"
+    return re.sub(r"(:[^:@]+@)", ":****@", url)
+
+
+def _redact_host(host: Optional[str], port: Optional[int]) -> str:
+    """Return sanitized host:port for logging."""
+    if not host:
+        return "<not set>"
+    return f"{host}:{port}" if port else host
 
 
 def is_true(strval):
@@ -40,26 +55,39 @@ url = os.getenv("ODOO_SESSION_REDIS_URL")
 password = os.getenv("ODOO_SESSION_REDIS_PASSWORD")
 expiration = os.getenv("ODOO_SESSION_REDIS_EXPIRATION")
 anon_expiration = os.getenv("ODOO_SESSION_REDIS_EXPIRATION_ANONYMOUS")
-# For non url connections
 ssl = os.getenv("ODOO_SESSION_REDIS_SSL", "1")
 ssl_cert_reqs = os.getenv("ODOO_SESSION_REDIS_SSL_CERT_REQS", "1")
 redis_cluster = os.getenv("ODOO_SESSION_REDIS_CLUSTER", "0")
 
-_logger.warning(f"session_redis env vars: sentinel_host={sentinel_host!r}, url={url!r}, host={host!r}, port={port!r}, prefix={prefix!r}, redis_cluster={redis_cluster!r}")
+_logger.debug(
+    "session_redis env vars: sentinel_host=%s, url=%s, host=%s, port=%s, "
+    "prefix=%s, redis_cluster=%s",
+    sentinel_host,
+    _redact_url(url),
+    host,
+    port,
+    prefix,
+    redis_cluster,
+)
 
 
 @functools.cached_property
 def session_store(self):
-    _logger.warning(f"session_store property accessed: sentinel_host={sentinel_host!r}, url={url!r}, redis_cluster={redis_cluster!r}")
+    _logger.debug(
+        "session_store property accessed: sentinel_host=%s, url=%s, redis_cluster=%s",
+        sentinel_host,
+        _redact_url(url),
+        redis_cluster,
+    )
     if sentinel_host:
-        _logger.warning(f"Using Sentinel: {sentinel_host}:{sentinel_port}")
+        _logger.debug("Using Sentinel: %s:%s", sentinel_host, sentinel_port)
         sentinel = Sentinel([(sentinel_host, sentinel_port)], password=password)
         redis_client = sentinel.master_for(sentinel_master_name)
     elif url:
-        _logger.warning(f"Using Redis URL: {url!r}")
+        _logger.debug("Using Redis URL: %s", _redact_url(url))
         redis_client = redis.from_url(url)
     elif is_true(redis_cluster):
-        _logger.warning(f"Using Redis Cluster: {host}:{port}")
+        _logger.debug("Using Redis Cluster: %s:%s", host, port)
         redis_client = redis.RedisCluster(
             host=host,
             port=port,
@@ -68,7 +96,7 @@ def session_store(self):
             ssl_cert_reqs=is_true(ssl_cert_reqs),
         )
     else:
-        _logger.warning(f"Using standard Redis: {host}:{port}")
+        _logger.debug("Using standard Redis: %s:%s", host, port)
         redis_client = redis.Redis(
             host=host,
             port=port,
@@ -86,55 +114,55 @@ def session_store(self):
         )
     except Exception as e:
         _logger.error(
-            f"Failed to initialize Redis session store: {type(e).__name__}: {e}"
+            "Failed to initialize Redis session store: %s: %s",
+            type(e).__name__,
+            e,
         )
         raise
 
 
-def purge_fs_sessions(path):
-    if not os.path.isdir(path):
-        _logger.warning(f"Session directory '{path}' does not exist.")
+def purge_fs_sessions(session_dir):
+    if not os.path.isdir(session_dir):
+        _logger.warning("Session directory '%s' does not exist.", session_dir)
         return
 
-    for fname in os.listdir(path):
-        path = os.path.join(path, fname)
+    for fname in os.listdir(session_dir):
+        fpath = os.path.join(session_dir, fname)
         try:
-            os.unlink(path)
+            os.unlink(fpath)
         except OSError:
             _logger.warning("OS Error during purge of redis sessions.")
 
 
 _odoo_session_redis_env = os.getenv("ODOO_SESSION_REDIS")
-_logger.warning(f"Checking ODOO_SESSION_REDIS: value={_odoo_session_redis_env!r}, is_true={is_true(_odoo_session_redis_env)}")
+_logger.debug(
+    "Checking ODOO_SESSION_REDIS: value=%s, is_true=%s",
+    _odoo_session_redis_env,
+    is_true(_odoo_session_redis_env),
+)
 
 if is_true(os.getenv("ODOO_SESSION_REDIS")):
-    _logger.warning("session_redis: Initializing Redis session store!")
+    _logger.info("session_redis: Initializing Redis session store!")
     if sentinel_host:
-        _logger.warning(
+        _logger.info(
             "HTTP sessions stored in Redis with prefix '%s'. Using Sentinel on %s:%s",
             prefix or "",
             sentinel_host,
             sentinel_port,
         )
     else:
-        _logger.warning(
+        _logger.info(
             "HTTP sessions stored in Redis with prefix '%s' on %s:%s",
             prefix or "",
-            host,
+            _redact_host(host, port),
             port,
         )
     http.Application.session_store = session_store
-    # cached_property needs __set_name__ to be called, but it is not called
-    # automatically since we are attaching the property after instance creation.
-    # So we have to do it manually
-    # See: https://docs.python.org/3/reference/datamodel.html#object.__set_name__
-    # Credit: https://stackoverflow.com/a/62161136
     http.Application.session_store.__set_name__(
         http.Application,
         "session_store",
     )
-    _logger.warning("session_store property has been assigned to http.Application")
-    # clean the existing sessions on the file system
+    _logger.info("session_store property has been assigned to http.Application")
     purge_fs_sessions(config.session_dir)
 else:
-    _logger.warning("session_redis: ODOO_SESSION_REDIS is not enabled, skipping Redis session store setup")
+    _logger.debug("session_redis: ODOO_SESSION_REDIS is not enabled, skipping Redis session store setup")
