@@ -3,20 +3,14 @@
 
 
 {
-    "name": "Monitoring: Statsd Metrics",
+    "name": "Monitoring: Prometheus Metrics with API token auth",
     "version": "17.0.1.0.0",
     "author": "Camptocamp,Odoo Community Association (OCA)",
     "license": "AGPL-3",
     "category": "category",
-    "depends": [
-        "base",
-        "web",
-        "server_environment",
-    ],
+    "depends": ["base", "web", "server_environment"],
     "website": "https://github.com/camptocamp/odoo-cloud-platform",
     "data": [],
-    "external_dependencies": {
-        "python": ["statsd"],
-    },
+    "external_dependencies": {"python": ["prometheus_client"]},
     "installable": True,
 }

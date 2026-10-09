@@ -5,9 +5,9 @@
 {
     "name": "Monitoring: Status",
     "version": "17.0.1.0.0",
-    "author": "Camptocamp,Odoo Community Association (OCA)",
+    "author": "Camptocamp, Odoo Community Association (OCA)",
     "license": "AGPL-3",
-    "category": "category",
+    "category": "Monitoring",
     "depends": ["base", "web"],
     "website": "https://github.com/camptocamp/odoo-cloud-platform",
     "data": [],

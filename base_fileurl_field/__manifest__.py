@@ -12,5 +12,5 @@
         "base_attachment_object_storage",
     ],
     "auto_install": False,
-    "installable": False,
+    "installable": True,
 }

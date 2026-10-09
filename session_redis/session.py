@@ -1,20 +1,30 @@
-# Copyright 2016-2019 Camptocamp SA
+# Copyright 2016-2024 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
+import builtins
 import json
 import logging
+from typing import TypeAlias
 
-from odoo.service import security
+import odoo.http
+from odoo.http import SESSION_LIFETIME
 from odoo.tools._vendor.sessions import SessionStore
 
 from . import json_encoding
 
-# this is equal to the duration of the session garbage collector in
+# this was equal to the duration of the session garbage collector in
 # odoo.http.session_gc()
-DEFAULT_SESSION_TIMEOUT = 60 * 60 * 24 * 7  # 7 days in seconds
 DEFAULT_SESSION_TIMEOUT_ANONYMOUS = 60 * 60 * 3  # 3 hours in seconds
 
 _logger = logging.getLogger(__name__)
+
+
+# Many parts of the session store API operate not on full session keys, but only
+# the first n characters of them (see odoo.http.STORED_SESSION_BYTES). In
+# particular used by Devices, but Odoo in general seems to promise that this
+# partial sid will be safe to store in the database, and can be used to later
+# find sessions, even if those sessions are actually longer.
+PartialSid: TypeAlias = str
 
 
 class RedisSessionStore(SessionStore):
@@ -31,7 +41,7 @@ class RedisSessionStore(SessionStore):
         super().__init__(session_class=session_class)
         self.redis = redis
         if expiration is None:
-            self.expiration = DEFAULT_SESSION_TIMEOUT
+            self.expiration = SESSION_LIFETIME
         else:
             self.expiration = expiration
         if anon_expiration is None:
@@ -40,7 +50,15 @@ class RedisSessionStore(SessionStore):
             self.anon_expiration = anon_expiration
         self.prefix = "session:"
         if prefix:
-            self.prefix = f"{self.prefix}:{prefix}:"
+            self.prefix = f"{self.prefix}:{prefix}::"
+
+    # Use the key generation method of the FileSystemSessionStore: it seems that
+    # the one on the general SessionStore does not generate long enough keys to
+    # support the device session rotation logic (SessionStore produces 40
+    # character long keys, while the new rotation logic appears to assume a
+    # length of at least 84).
+    generate_key = odoo.http.FilesystemSessionStore.generate_key
+    is_valid_key = odoo.http.FilesystemSessionStore.is_valid_key
 
     def build_key(self, sid):
         return f"{self.prefix}{sid}"
@@ -48,19 +66,30 @@ class RedisSessionStore(SessionStore):
     def save(self, session):
         key = self.build_key(session.sid)
 
-        # allow to set a custom expiration for a session
+        # If the session has a deletion_time, it is slated for rotation, and
+        # should be removed once the rotation window is over. See
+        # odoo.http.SESSION_DELETION_TIMER.
+        # Otherwise, allow to set a custom expiration for a session
         # such as a very short one for monitoring requests
         if session.uid:
-            expiration = session.expiration or self.expiration
+            expiration = (
+                session.get("deletion_time")
+                or session.get("expiration")
+                or self.expiration
+            )
         else:
-            expiration = session.expiration or self.anon_expiration
+            expiration = (
+                session.get("deletion_time")
+                or session.get("expiration")
+                or self.anon_expiration
+            )
         if _logger.isEnabledFor(logging.DEBUG):
             if session.uid:
-                user_msg = f"user '{session.login}' (id: {session.uid})"
+                user_msg = "user '%s' (id: %s)" % (session.login, session.uid)
             else:
                 user_msg = "anonymous user"
             _logger.debug(
-                "saving session with key '%s' and " "expiration of %s seconds for %s",
+                "saving session with key '%s' and expiration of %s seconds for %s",
                 key,
                 expiration,
                 user_msg,
@@ -69,53 +98,100 @@ class RedisSessionStore(SessionStore):
         data = json.dumps(dict(session), cls=json_encoding.SessionEncoder).encode(
             "utf-8"
         )
-        if self.redis.set(key, data):
-            return self.redis.expire(key, expiration)
+        try:
+            if self.redis.set(key, data):
+                if not (expiration and isinstance(expiration, int)):
+                    expiration = DEFAULT_SESSION_TIMEOUT_ANONYMOUS
+                return self.redis.expire(key, expiration)
+        except Exception as e:
+            _logger.error(
+                "Failed to save session '%s' to Redis: %s: %s",
+                key,
+                type(e).__name__,
+                e,
+            )
+            return False
 
     def delete(self, session):
         key = self.build_key(session.sid)
         _logger.debug("deleting session with key %s", key)
-        return self.redis.delete(key)
+        try:
+            return self.redis.delete(key)
+        except Exception as e:
+            _logger.error(
+                "Failed to delete session '%s' from Redis: %s: %s",
+                key,
+                type(e).__name__,
+                e,
+            )
+            return False
 
     def get(self, sid):
         if not self.is_valid_key(sid):
             _logger.debug(
-                "session with invalid sid '%s' has been asked, " "returning a new one",
+                "session with invalid sid '%s' has been asked, returning a new one",
                 sid,
             )
             return self.new()
 
         key = self.build_key(sid)
-        saved = self.redis.get(key)
+        _logger.debug("RedisSessionStore.get() called for sid=%s, key=%s", sid, key)
+        try:
+            _logger.debug("Attempting redis.get(%s)", key)
+            saved = self.redis.get(key)
+            _logger.debug(
+                "redis.get() returned: %s (len=%s)",
+                type(saved).__name__,
+                len(saved) if saved else 0,
+            )
+        except Exception as e:
+            _logger.error(
+                "REDIS ERROR in get(): %s: %s. Returning new session instead of 500 error.",
+                type(e).__name__,
+                e,
+            )
+            return self.new()
         if not saved:
             _logger.debug(
-                "session with non-existent key '%s' has been asked, "
-                "returning a new one",
+                "session with non-existent key '%s' has been asked, returning a new one",
                 key,
             )
             return self.new()
         try:
             data = json.loads(saved.decode("utf-8"), cls=json_encoding.SessionDecoder)
-        except ValueError:
-            _logger.debug(
-                "session for key '%s' has been asked but its json "
-                "content could not be read, it has been reset",
+        except Exception as e:
+            _logger.warning(
+                "Failed to deserialize session JSON for '%s': %s: %s. "
+                "Returning new session with empty data.",
                 key,
+                type(e).__name__,
+                e,
             )
             data = {}
-        return self.session_class(data, sid, False)
+        try:
+            session = self.session_class(data, sid, False)
+            _logger.debug("Session created successfully for %s", key)
+            return session
+        except Exception as e:
+            _logger.error(
+                "Failed to initialize session class for '%s': %s: %s. "
+                "Returning new session instead of 500 error.",
+                key,
+                type(e).__name__,
+                e,
+            )
+            return self.new()
 
     def list(self):
-        keys = self.redis.keys("%s*" % self.prefix)
+        keys = []
+        for key in self.redis.scan_iter(match=f"{self.prefix}*", count=1000):
+            keys.append(key)
         _logger.debug("a listing redis keys has been called")
         return [key[len(self.prefix) :] for key in keys]
 
-    def rotate(self, session, env):
-        self.delete(session)
-        session.sid = self.generate_key()
-        if session.uid and env:
-            session.session_token = security.compute_session_token(session, env)
-        self.save(session)
+    # The FilesystemSessionStore's rotate does not do anything file-system
+    # specific so it can just be reused here
+    rotate = odoo.http.FilesystemSessionStore.rotate
 
     def vacuum(self, *args, **kwargs):
         """Do not garbage collect the sessions
@@ -124,3 +200,63 @@ class RedisSessionStore(SessionStore):
         expiration.
         """
         return None
+
+    def delete_old_sessions(self, session):
+        """
+        # Deletion of rotated sessions is handled by updating the sessions'
+        # expiry based on deletion_time in save(), so this method is redundant
+        # when using a redis store.
+
+        # While this method is not part of the generic SessionStore API, it is
+        # defined on the file session store, and is used by the Session itself
+        # as part of the session rotation (see odoo.http.Session._delete_old_sessions).
+        """
+        return
+
+    def get_missing_session_identifiers(
+        self, identifiers: builtins.list[PartialSid]
+    ) -> set[PartialSid]:
+        """
+        Given a list of partial session ids, return a set of those session ids
+        which no longer exist in the keystore.
+
+        While this method is not part of the generic SessionStore API, it is
+        defined on the file session store, and is used by Odoo's devices to
+        figure out what needs to be revoked
+        (see odoo.addons.base.models.res_device.ResDeviceLog.__update_revoked).
+        """
+        identifiers = set(identifiers)
+        not_found = set()
+        for partial_sid in identifiers:
+            key_pattern = f"{self.prefix}{partial_sid}*"
+            found = False
+            for _ in self.redis.scan_iter(match=key_pattern, count=100):
+                found = True
+                break
+            if not found:
+                not_found.add(partial_sid)
+        return not_found
+
+    def delete_from_identifiers(self, identifiers: builtins.list[PartialSid]):
+        """
+        Given a list of partial session ids, remove any that are in the session store.
+
+        While this method is not part of the generic SessionStore API, it is
+        defined on the file session store, and is used by devices when revoking
+        device sessions (see odoo.addons.base.models.res_device.ResDevice._revoke).
+        """
+        patterns_to_unlink = []
+        for identifier in identifiers:
+            # Avoid removing a session if it does not match an identifier. See this same
+            # comment in odoo.http.FileSessionStore.delete_from_identifiers.
+            if not odoo.http._session_identifier_re.match(identifier):
+                raise ValueError(
+                    "Identifier format incorrect, did you pass in a string instead ",
+                    "of a list?",
+                )
+            patterns_to_unlink.append(f"{self.prefix}{identifier}*")
+        keys_to_unlink = []
+        for pattern in patterns_to_unlink:
+            keys_to_unlink.extend(self.redis.scan_iter(match=pattern))
+        if keys_to_unlink:
+            self.redis.delete(*keys_to_unlink)

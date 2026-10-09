@@ -1,4 +1,4 @@
-# Copyright 2016-2020 Camptocamp SA
+# Copyright 2016-2024 Camptocamp SA
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import json
@@ -20,7 +20,7 @@ class SessionEncoder(json.JSONEncoder):
             return {"_type": "date_isoformat", "value": obj.isoformat()}
         elif isinstance(obj, set):
             return {"_type": "set", "value": tuple(obj)}
-        return json.JSONEncoder.default(self, obj)
+        return super().default(obj)
 
 
 class SessionDecoder(json.JSONDecoder):
