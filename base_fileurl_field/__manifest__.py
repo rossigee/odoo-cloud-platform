@@ -12,5 +12,9 @@
         "base_attachment_object_storage",
     ],
     "auto_install": False,
-    "installable": True,
+    # Uninstalled by default: the declared dependency
+    # base_attachment_object_storage is no longer present on this branch.
+    # Matches camptocamp's own 18.0 and 19.0 branches, which drop that
+    # module and mark this one installable=False for the same reason.
+    "installable": False,
 }
