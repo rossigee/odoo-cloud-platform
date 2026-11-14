@@ -1,8 +1,8 @@
 
 <!-- /!\ Non OCA Context : Set here the badge of your runbot / runboat instance. -->
-[![Pre-commit Status](https://github.com/camptocamp/odoo-cloud-platform/actions/workflows/pre-commit.yml/badge.svg?branch=19.0)](https://github.com/camptocamp/odoo-cloud-platform/actions/workflows/pre-commit.yml?query=branch%3A19.0)
-[![Build Status](https://github.com/camptocamp/odoo-cloud-platform/actions/workflows/test.yml/badge.svg?branch=19.0)](https://github.com/camptocamp/odoo-cloud-platform/actions/workflows/test.yml?query=branch%3A19.0)
-[![codecov](https://codecov.io/gh/camptocamp/odoo-cloud-platform/branch/19.0/graph/badge.svg)](https://codecov.io/gh/camptocamp/odoo-cloud-platform)
+[![Pre-commit Status](https://github.com/camptocamp/odoo-cloud-platform/actions/workflows/pre-commit.yml/badge.svg?branch=18.0)](https://github.com/camptocamp/odoo-cloud-platform/actions/workflows/pre-commit.yml?query=branch%3A18.0)
+[![Build Status](https://github.com/camptocamp/odoo-cloud-platform/actions/workflows/test.yml/badge.svg?branch=18.0)](https://github.com/camptocamp/odoo-cloud-platform/actions/workflows/test.yml?query=branch%3A18.0)
+[![codecov](https://codecov.io/gh/camptocamp/odoo-cloud-platform/branch/18.0/graph/badge.svg)](https://codecov.io/gh/camptocamp/odoo-cloud-platform)
 <!-- /!\ Non OCA Context : Set here the badge of your translation instance. -->
 
 <!-- /!\ do not modify above this line -->
@@ -159,7 +159,7 @@ some parameters such as the `ir_attachment.location` and migrate the existing
 attachments to the object storage.
 
 From `anthem`, it can be called like this:
-    `ctx.env['cloud.platform'].install()`
+    `ctx.env['cloud.platform'].check()`
 
 ### Startup checks
 
