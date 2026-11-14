@@ -4,6 +4,8 @@
 import logging
 import os
 
+from odoo.tools import config
+
 from .strtobool import strtobool
 
 _logger = logging.getLogger(__name__)
