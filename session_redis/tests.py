@@ -6,7 +6,7 @@ from unittest.mock import Mock
 
 import redis
 
-from session_redis.session import RedisSessionStore
+from .session import RedisSessionStore
 
 
 class TestSessionRedisErrorHandling(unittest.TestCase):
