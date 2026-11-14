@@ -4,7 +4,9 @@
 import logging
 import os
 
-from .strtobool import strtobool
+from odoo.tools import config
+
+from .models.strtobool import strtobool
 
 _logger = logging.getLogger(__name__)
 

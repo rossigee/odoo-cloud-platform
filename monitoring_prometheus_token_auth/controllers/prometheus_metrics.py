@@ -3,9 +3,10 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
 import os
+
 from prometheus_client import generate_latest
 
-from odoo.http import Controller, route, request
+from odoo.http import Controller, request, route
 
 
 class PrometheusController(Controller):
@@ -22,4 +23,6 @@ class PrometheusController(Controller):
                     return request.make_response(generate_latest(), headers=headers)
 
         # No valid token - return 401
-        return request.make_response('Unauthorized', status=401, headers={'Content-Type': 'text/plain'})
+        return request.make_response(
+            "Unauthorized", status=401, headers={"Content-Type": "text/plain"}
+        )

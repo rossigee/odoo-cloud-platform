@@ -30,14 +30,6 @@ class IrHttp(models.AbstractModel):
                 request.params["model"].replace(".", "_"),
                 request.params["method"],
             ]
-        elif path_info.startswith("/web/dataset/exec_workflow"):
-            parts += [
-                "workflow",
-                customer,
-                environment,
-                request.params["model"].replace(".", "_"),
-                request.params["signal"],
-            ]
         else:
             parts += [
                 "request",

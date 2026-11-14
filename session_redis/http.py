@@ -4,7 +4,6 @@ import functools
 import logging
 import os
 import re
-from typing import Optional
 
 from odoo import http
 from odoo.tools import config
@@ -22,14 +21,14 @@ except ImportError:
     _logger.debug("Cannot 'import redis'.")
 
 
-def _redact_url(url: Optional[str]) -> str:
+def _redact_url(url: str | None) -> str:
     """Redact password from Redis URL for safe logging."""
     if not url:
         return "<not set>"
     return re.sub(r"(:[^:@]+@)", ":****@", url)
 
 
-def _redact_host(host: Optional[str], port: Optional[int]) -> str:
+def _redact_host(host: str | None, port: int | None) -> str:
     """Return sanitized host:port for logging."""
     if not host:
         return "<not set>"
@@ -165,4 +164,7 @@ if is_true(os.getenv("ODOO_SESSION_REDIS")):
     _logger.info("session_store property has been assigned to http.Application")
     purge_fs_sessions(config.session_dir)
 else:
-    _logger.debug("session_redis: ODOO_SESSION_REDIS is not enabled, skipping Redis session store setup")
+    _logger.debug(
+        "session_redis: ODOO_SESSION_REDIS is not enabled, "
+        "skipping Redis session store setup"
+    )

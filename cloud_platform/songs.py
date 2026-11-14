@@ -1,2 +1,2 @@
 def install(ctx):
-    ctx.env["cloud.platform"].install()
+    ctx.env["cloud.platform"].check()

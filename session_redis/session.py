@@ -85,7 +85,7 @@ class RedisSessionStore(SessionStore):
             )
         if _logger.isEnabledFor(logging.DEBUG):
             if session.uid:
-                user_msg = "user '%s' (id: %s)" % (session.login, session.uid)
+                user_msg = f"user '{session.login}' (id: {session.uid})"
             else:
                 user_msg = "anonymous user"
             _logger.debug(
@@ -146,14 +146,16 @@ class RedisSessionStore(SessionStore):
             )
         except Exception as e:
             _logger.error(
-                "REDIS ERROR in get(): %s: %s. Returning new session instead of 500 error.",
+                "REDIS ERROR in get(): %s: %s. "
+                "Returning new session instead of 500 error.",
                 type(e).__name__,
                 e,
             )
             return self.new()
         if not saved:
             _logger.debug(
-                "session with non-existent key '%s' has been asked, returning a new one",
+                "session with non-existent key '%s' has been asked, "
+                "returning a new one",
                 key,
             )
             return self.new()
@@ -200,18 +202,6 @@ class RedisSessionStore(SessionStore):
         expiration.
         """
         return None
-
-    def delete_old_sessions(self, session):
-        """
-        # Deletion of rotated sessions is handled by updating the sessions'
-        # expiry based on deletion_time in save(), so this method is redundant
-        # when using a redis store.
-
-        # While this method is not part of the generic SessionStore API, it is
-        # defined on the file session store, and is used by the Session itself
-        # as part of the session rotation (see odoo.http.Session._delete_old_sessions).
-        """
-        return
 
     def get_missing_session_identifiers(
         self, identifiers: builtins.list[PartialSid]
