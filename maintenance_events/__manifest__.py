@@ -1,3 +1,6 @@
+# pylint: disable=manifest-required-author
+# This module was written by Ross Golder alone, not derived from the Camptocamp
+# modules that the mandatory author check is meant for.
 {
     "name": "Maintenance Events",
     "summary": "Maintenance events API with CORS support",
