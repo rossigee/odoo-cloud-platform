@@ -2,16 +2,17 @@
 # Copyright 2025 Ross Golder
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html)
 
-from prometheus_client import Counter, Summary
 from werkzeug.exceptions import BadRequest, Unauthorized
 
 from odoo import models
 from odoo.http import request
 
-REQUEST_TIME = Summary(
-    "request_latency_sec", "Request response time in sec", ["query_type"]
+# Reuse the metrics defined by monitoring_prometheus. Defining the same
+# Prometheus metric names again raises DuplicateTimeseries at load time.
+from odoo.addons.monitoring_prometheus.models.ir_http import (  # noqa: E402
+    LONGPOLLING_COUNT,
+    REQUEST_TIME,
 )
-LONGPOLLING_COUNT = Counter("longpolling", "Longpolling request count")
 
 
 class IrHttp(models.AbstractModel):
